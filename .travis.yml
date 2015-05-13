@@ -24,6 +24,6 @@ android:
     - sys-img-x86-android-17
 
 after_success:
-    - ls -la Application/build/outputs/apk
-    - ls -la Application
-    - curl -T Application/build/outputs/apk/Application-release-unsigned.apk chunk.io 
+    - ls -la app/build/outputs/apk
+    - ls -la app
+    - curl -T app/build/outputs/apk/Application-release-unsigned.apk chunk.io 
