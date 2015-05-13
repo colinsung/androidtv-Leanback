@@ -26,4 +26,4 @@ android:
 after_success:
     - ls -la app/build/outputs/apk
     - ls -la app
-    - curl -T app/build/outputs/apk/Application-release-unsigned.apk chunk.io 
+    - curl -T app/build/outputs/apk/app-release-unsigned.apk chunk.io 
