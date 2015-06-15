@@ -62,6 +62,7 @@ public class PlaybackActivity extends Activity {
 
         setContentView(R.layout.playback_controls);
         loadViews();
+        playPause(true);
         //Example for handling resizing view for overscan
         //Utils.overScan(this, mVideoView);
     }
@@ -71,6 +72,7 @@ public class PlaybackActivity extends Activity {
         super.onDestroy();
         stopPlayback();
         mVideoView.suspend();
+        mVideoView.setVideoPath(null);
         mSession.release();
     }
 
