@@ -21,12 +21,26 @@ android {
         versionName "${versionMajor}.${versionMinor}.${versionPatch}.${buildTime()}"
     }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+    if(System.getenv("ANDROID_KEYSTORE")) {
+
+        signingConfigs {
+            release {
+                storeFile file(System.getenv("ANDROID_KEYSTORE"))
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+
+        buildTypes {
+            release {
+		signingConfig signingConfigs.release
+                minifyEnabled false
+                proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            }
         }
     }
+
     lintOptions {
         abortOnError false
     }
