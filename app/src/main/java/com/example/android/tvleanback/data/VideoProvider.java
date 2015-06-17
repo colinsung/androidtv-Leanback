@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 
@@ -53,12 +54,18 @@ public class VideoProvider {
     private static String TAG_TITLE = "title";
 
     private static HashMap<String, List<Movie>> sMovieList;
+    private static HashMap<String, Movie> sMovieListById;
+
     private static Context sContext;
     private static String sPrefixUrl;
 
     public static void setContext(Context context) {
         if (sContext == null)
             sContext = context;
+    }
+
+    public static Movie getMovieById(String mediaId) {
+        return sMovieListById.get(mediaId);
     }
 
     public static HashMap<String, List<Movie>> getMovieList() {
@@ -70,7 +77,8 @@ public class VideoProvider {
         if (null != sMovieList) {
             return sMovieList;
         }
-        sMovieList = new HashMap<String, List<Movie>>();
+        sMovieList = new HashMap<>();
+        sMovieListById = new HashMap<>();
 
         JSONObject jsonObj = new VideoProvider().parseUrl(url);
         JSONArray categories = jsonObj.getJSONArray(TAG_GOOGLE_VIDEOS);
@@ -104,9 +112,11 @@ public class VideoProvider {
                         cardImageUrl = getThumbPrefix(category_name, title,
                                 video.getString(TAG_CARD_THUMB));
                         studio = video.getString(TAG_STUDIO);
-                        categoryList.add(buildMovieInfo(category_name, title, description, studio,
-                                videoUrl, cardImageUrl,
-                                bgImageUrl));
+
+                        Movie movie = buildMovieInfo(category_name, title, description, studio,
+                                videoUrl, cardImageUrl, bgImageUrl);
+                        sMovieListById.put(movie.getId(), movie);
+                        categoryList.add(movie);
                     }
                     sMovieList.put(category_name, categoryList);
                 }
@@ -155,15 +165,18 @@ public class VideoProvider {
     protected JSONObject parseUrl(String urlString) {
         Log.d(TAG, "Parse URL: " + urlString);
         InputStream is = null;
+        InputStream stream = null;
 
         sPrefixUrl = sContext.getResources().getString(R.string.prefix_url);
 
         try {
             java.net.URL url = new java.net.URL(urlString);
             URLConnection urlConnection = url.openConnection();
-            is = new BufferedInputStream(urlConnection.getInputStream());
+            stream = urlConnection.getInputStream();
+            is = new BufferedInputStream(stream);
+
             BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    urlConnection.getInputStream(), "iso-8859-1"), 8);
+                    stream, "iso-8859-1"), 8);
             StringBuilder sb = new StringBuilder();
             String line = null;
             while ((line = reader.readLine()) != null) {
@@ -180,6 +193,14 @@ public class VideoProvider {
                     is.close();
                 } catch (IOException e) {
                     Log.d(TAG, "JSON feed closed", e);
+                }
+            }
+
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    Log.d(TAG, "Input stream closed", e);
                 }
             }
         }
