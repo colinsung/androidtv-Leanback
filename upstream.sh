@@ -4,4 +4,3 @@ git fetch upstream
 git reset --hard
 git log HEAD..upstream/master
 git merge upstream/master --no-commit
-
