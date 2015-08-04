@@ -33,7 +33,10 @@ import android.support.v17.leanback.widget.OnActionClickedListener;
 import android.support.v17.leanback.widget.OnItemViewClickedListener;
 import android.support.v17.leanback.widget.OnItemViewSelectedListener;
 import android.support.v17.leanback.widget.PlaybackControlsRow;
+import android.support.v17.leanback.widget.PlaybackControlsRow.ClosedCaptioningAction;
 import android.support.v17.leanback.widget.PlaybackControlsRow.FastForwardAction;
+import android.support.v17.leanback.widget.PlaybackControlsRow.HighQualityAction;
+import android.support.v17.leanback.widget.PlaybackControlsRow.MoreActions;
 import android.support.v17.leanback.widget.PlaybackControlsRow.PlayPauseAction;
 import android.support.v17.leanback.widget.PlaybackControlsRow.RepeatAction;
 import android.support.v17.leanback.widget.PlaybackControlsRow.RewindAction;
@@ -66,14 +69,15 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /*
- * Class for video playback with media control
+ * The PlaybackOverlayFragment class handles the Fragment associated with displaying the UI for the
+ * media controls such as play / pause / skip forward / skip backward etc.
+ *
+ * The UI is updated through events that it receives from its MediaController
  */
 public class PlaybackOverlayFragment extends android.support.v17.leanback.app.PlaybackOverlayFragment {
     private static final String TAG = "PlaybackOverlayFragment";
     private static final boolean SHOW_DETAIL = true;
     private static final boolean HIDE_MORE_ACTIONS = false;
-    private static final int PRIMARY_CONTROLS = 5;
-    private static final boolean SHOW_IMAGE = PRIMARY_CONTROLS <= 5;
     private static final int BACKGROUND_TYPE = PlaybackOverlayFragment.BG_LIGHT;
     private static final int CARD_WIDTH = 150;
     private static final int CARD_HEIGHT = 240;
@@ -87,15 +91,18 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
     private ArrayObjectAdapter mRowsAdapter;
     private ArrayObjectAdapter mPrimaryActionsAdapter;
     private ArrayObjectAdapter mSecondaryActionsAdapter;
+    private ClosedCaptioningAction mClosedCaptioningAction;
+    private FastForwardAction mFastForwardAction;
+    private HighQualityAction mHighQualityAction;
+    private MoreActions mMoreActions;
     private PlayPauseAction mPlayPauseAction;
     private RepeatAction mRepeatAction;
-    private ThumbsUpAction mThumbsUpAction;
-    private ThumbsDownAction mThumbsDownAction;
-    private ShuffleAction mShuffleAction;
-    private FastForwardAction mFastForwardAction;
     private RewindAction mRewindAction;
+    private ShuffleAction mShuffleAction;
     private SkipNextAction mSkipNextAction;
     private SkipPreviousAction mSkipPreviousAction;
+    private ThumbsDownAction mThumbsDownAction;
+    private ThumbsUpAction mThumbsUpAction;
     private PlaybackControlsRow mPlaybackControlsRow;
     private ArrayList<Movie> mItems = new ArrayList<Movie>();
     private int mCurrentItem;
@@ -114,7 +121,7 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "onCreate");
         super.onCreate(savedInstanceState);
-        
+
         mItems = new ArrayList<>();
         mSelectedMovie = getActivity()
                 .getIntent().getParcelableExtra(MovieDetailsActivity.MOVIE);
@@ -167,7 +174,6 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
         super.onStart();
     }
 
-
     @Override
     public void onStop() {
         stopProgressAutomation();
@@ -183,7 +189,6 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
         }
         super.onDetach();
     }
-
 
     @Override
     public void onResume() {
@@ -206,9 +211,9 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
                 if (action.getId() == mPlayPauseAction.getId()) {
                     togglePlayback(mPlayPauseAction.getIndex() == PlayPauseAction.PLAY);
                 } else if (action.getId() == mSkipNextAction.getId()) {
-                    next(mCurrentPlaybackState == PlaybackState.STATE_PLAYING);
+                    next();
                 } else if (action.getId() == mSkipPreviousAction.getId()) {
-                    prev(mCurrentPlaybackState == PlaybackState.STATE_PLAYING);
+                    prev();
                 } else if (action.getId() == mFastForwardAction.getId()) {
                     fastForward();
                 } else if (action.getId() == mRewindAction.getId()) {
@@ -255,52 +260,46 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
         mPlaybackControlsRow.setPrimaryActionsAdapter(mPrimaryActionsAdapter);
         mPlaybackControlsRow.setSecondaryActionsAdapter(mSecondaryActionsAdapter);
 
-        mPlayPauseAction = new PlayPauseAction(getActivity());
-        mRepeatAction = new RepeatAction(getActivity());
-        mThumbsUpAction = new ThumbsUpAction(getActivity());
-        mThumbsDownAction = new ThumbsDownAction(getActivity());
-        mShuffleAction = new ShuffleAction(getActivity());
-        mSkipNextAction = new PlaybackControlsRow.SkipNextAction(getActivity());
-        mSkipPreviousAction = new PlaybackControlsRow.SkipPreviousAction(getActivity());
-        mFastForwardAction = new PlaybackControlsRow.FastForwardAction(getActivity());
-        mRewindAction = new PlaybackControlsRow.RewindAction(getActivity());
+        Activity activity = getActivity();
+        mPlayPauseAction = new PlayPauseAction(activity);
+        mRepeatAction = new RepeatAction(activity);
+        mThumbsUpAction = new ThumbsUpAction(activity);
+        mThumbsDownAction = new ThumbsDownAction(activity);
+        mShuffleAction = new ShuffleAction(activity);
+        mSkipNextAction = new SkipNextAction(activity);
+        mSkipPreviousAction = new SkipPreviousAction(activity);
+        mFastForwardAction = new FastForwardAction(activity);
+        mRewindAction = new RewindAction(activity);
+        mHighQualityAction = new HighQualityAction(activity);
+        mClosedCaptioningAction = new ClosedCaptioningAction(activity);
+        mMoreActions = new MoreActions(activity);
 
-        if (PRIMARY_CONTROLS > 5) {
-            mPrimaryActionsAdapter.add(mThumbsUpAction);
-        } else {
-            mSecondaryActionsAdapter.add(mThumbsUpAction);
-        }
+        // Add main controls to primary adapter.
         mPrimaryActionsAdapter.add(mSkipPreviousAction);
-        if (PRIMARY_CONTROLS > 3) {
-            mPrimaryActionsAdapter.add(new PlaybackControlsRow.RewindAction(getActivity()));
-        }
+        mPrimaryActionsAdapter.add(mRewindAction);
         mPrimaryActionsAdapter.add(mPlayPauseAction);
-        if (PRIMARY_CONTROLS > 3) {
-            mPrimaryActionsAdapter.add(new PlaybackControlsRow.FastForwardAction(getActivity()));
-        }
+        mPrimaryActionsAdapter.add(mFastForwardAction);
         mPrimaryActionsAdapter.add(mSkipNextAction);
 
+        // Add rest of controls to secondary adapter.
+        mSecondaryActionsAdapter.add(mThumbsUpAction);
         mSecondaryActionsAdapter.add(mRepeatAction);
         mSecondaryActionsAdapter.add(mShuffleAction);
-        if (PRIMARY_CONTROLS > 5) {
-            mPrimaryActionsAdapter.add(mThumbsDownAction);
-        } else {
-            mSecondaryActionsAdapter.add(mThumbsDownAction);
-        }
-        mSecondaryActionsAdapter.add(new PlaybackControlsRow.HighQualityAction(getActivity()));
-        mSecondaryActionsAdapter.add(new PlaybackControlsRow.ClosedCaptioningAction(getActivity()));
+        mSecondaryActionsAdapter.add(mThumbsDownAction);
+        mSecondaryActionsAdapter.add(mHighQualityAction);
+        mSecondaryActionsAdapter.add(mClosedCaptioningAction);
+        mSecondaryActionsAdapter.add(mMoreActions);
     }
 
     private void notifyChanged(Action action) {
-        ArrayObjectAdapter adapter = mPrimaryActionsAdapter;
-        if (adapter.indexOf(action) >= 0) {
-            adapter.notifyArrayItemRangeChanged(adapter.indexOf(action), 1);
-            return;
-        }
-        adapter = mSecondaryActionsAdapter;
-        if (adapter.indexOf(action) >= 0) {
-            adapter.notifyArrayItemRangeChanged(adapter.indexOf(action), 1);
-            return;
+        int index = mPrimaryActionsAdapter.indexOf(action);
+        if (index >= 0) {
+            mPrimaryActionsAdapter.notifyArrayItemRangeChanged(index, 1);
+        } else {
+            index = mSecondaryActionsAdapter.indexOf(action);
+            if (index >= 0) {
+                mSecondaryActionsAdapter.notifyArrayItemRangeChanged(index, 1);
+            }
         }
     }
 
@@ -318,9 +317,9 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
         }
         mPlaybackControlsRow.setTotalTime((int) duration);
 
-        if (SHOW_IMAGE) {
-            updateVideoImage(cardImageUrl);
-        }
+        // Show the video card image if there is enough room in the UI for it.
+        // If you have many primary actions, you may not have enough room.
+        updateVideoImage(cardImageUrl);
     }
 
     private void addOtherRows() {
@@ -353,7 +352,7 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
 
                     if (totalTime > 0 && totalTime <= currentTime) {
                         stopProgressAutomation();
-                        next(true);
+                        next();
                     } else {
                         mHandler.postDelayed(this, updatePeriod);
                     }
@@ -363,30 +362,12 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
         }
     }
 
-    private void next(boolean autoPlay) {
-        if (++mCurrentItem >= mItems.size()) {
-            mCurrentItem = 0;
-        }
-        Bundle bundle = new Bundle();
-        bundle.putBoolean(PlaybackActivity.AUTO_PLAY, autoPlay);
-        if (autoPlay) {
-            mCurrentPlaybackState = PlaybackState.STATE_PAUSED;
-        }
-        mMediaController.getTransportControls().playFromMediaId(mItems.get(mCurrentItem).getId(), bundle);
-        mFfwRwdSpeed = INITIAL_SPEED;
+    private void next() {
+        mMediaController.getTransportControls().skipToNext();
     }
 
-    private void prev(boolean autoPlay) {
-        if (--mCurrentItem < 0) {
-            mCurrentItem = mItems.size() - 1;
-        }
-        Bundle bundle = new Bundle();
-        bundle.putBoolean(PlaybackActivity.AUTO_PLAY, autoPlay);
-        if (autoPlay) {
-            mCurrentPlaybackState = PlaybackState.STATE_PAUSED;
-        }
-        mMediaController.getTransportControls().playFromMediaId(mItems.get(mCurrentItem).getId(), bundle);
-        mFfwRwdSpeed = INITIAL_SPEED;
+    private void prev() {
+        mMediaController.getTransportControls().skipToPrevious();
     }
 
     private void fastForward() {
@@ -481,9 +462,13 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
     }
 
     private class MediaControllerCallback extends MediaController.Callback {
+
         @Override
         public void onPlaybackStateChanged(PlaybackState state) {
+            // The playback state has changed, so update your UI accordingly.
+            // This should not update any media player / state!
             Log.d(TAG, "playback state changed: " + state.getState());
+
             if (state.getState() == PlaybackState.STATE_PLAYING && mCurrentPlaybackState != PlaybackState.STATE_PLAYING) {
                 mCurrentPlaybackState = PlaybackState.STATE_PLAYING;
                 startProgressAutomation();
@@ -498,9 +483,19 @@ public class PlaybackOverlayFragment extends android.support.v17.leanback.app.Pl
                 mPlayPauseAction.setIndex(PlayPauseAction.PLAY);
                 mPlayPauseAction.setIcon(mPlayPauseAction.getDrawable(PlayPauseAction.PLAY));
                 notifyChanged(mPlayPauseAction);
+            } else if (state.getState() == PlaybackState.STATE_SKIPPING_TO_NEXT) {
+                mCurrentPlaybackState = PlaybackState.STATE_SKIPPING_TO_NEXT;
+                startProgressAutomation();
+                setFadingEnabled(true);
+                notifyChanged(mSkipNextAction);
+            } else if (state.getState() == PlaybackState.STATE_SKIPPING_TO_PREVIOUS) {
+                mCurrentPlaybackState = PlaybackState.STATE_SKIPPING_TO_PREVIOUS;
+                startProgressAutomation();
+                setFadingEnabled(true);
+                notifyChanged(mSkipPreviousAction);
             }
 
-            int currentTime = (int)state.getPosition();
+            int currentTime = (int) state.getPosition();
             mPlaybackControlsRow.setCurrentTime(currentTime);
             mPlaybackControlsRow.setBufferedProgress(currentTime + SIMULATED_BUFFERED_TIME);
         }

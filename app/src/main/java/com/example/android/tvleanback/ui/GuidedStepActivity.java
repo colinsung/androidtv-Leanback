@@ -38,12 +38,12 @@ public class GuidedStepActivity extends Activity {
     private static final int CONTINUE = 0;
     private static final int BACK = 1;
     private static final int OPTION_CHECK_SET_ID = 10;
-    private static final String[] OPTION_NAMES = { "Option A", "Option B", "Option C" };
-    private static final String[] OPTION_DESCRIPTIONS = { "Here's one thing you can do",
-            "Here's another thing you can do", "Here's one more thing you can do" };
-    private static final int[] OPTION_DRAWABLES = { R.drawable.ic_guidedstep_option_a,
-            R.drawable.ic_guidedstep_option_b, R.drawable.ic_guidedstep_option_c };
-    private static final boolean[] OPTION_CHECKED = { true, false, false };
+    private static final String[] OPTION_NAMES = {"Option A", "Option B", "Option C"};
+    private static final String[] OPTION_DESCRIPTIONS = {"Here's one thing you can do",
+            "Here's another thing you can do", "Here's one more thing you can do"};
+    private static final int[] OPTION_DRAWABLES = {R.drawable.ic_guidedstep_option_a,
+            R.drawable.ic_guidedstep_option_b, R.drawable.ic_guidedstep_option_c};
+    private static final boolean[] OPTION_CHECKED = {true, false, false};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +62,7 @@ public class GuidedStepActivity extends Activity {
     }
 
     private static void addCheckedAction(List<GuidedAction> actions, int iconResId, Context context,
-            String title, String desc, boolean checked) {
+                                         String title, String desc, boolean checked) {
         GuidedAction guidedAction = new GuidedAction.Builder()
                 .title(title)
                 .description(desc)
@@ -153,27 +153,21 @@ public class GuidedStepActivity extends Activity {
         @Override
         public void onGuidedActionClicked(GuidedAction action) {
             FragmentManager fm = getFragmentManager();
-            GuidedStepFragment.add(fm, createThirdStepFragment());
+            ThirdStepFragment next = ThirdStepFragment.newInstance(getSelectedActionPosition() - 1);
+            GuidedStepFragment.add(fm, next);
         }
 
-        private ThirdStepFragment createThirdStepFragment() {
-            ThirdStepFragment thirdStepFragment = new ThirdStepFragment();
-            Bundle argumentBundle = new Bundle();
-            argumentBundle.putInt("option", getSelectedActionPosition()-1);
-            thirdStepFragment.setArguments(argumentBundle);
-            return thirdStepFragment;
-        }
     }
 
     public static class ThirdStepFragment extends GuidedStepFragment {
-        private int mOption;
+        private final static String ARG_OPTION_IDX = "arg.option.idx";
 
-        public ThirdStepFragment() {
-        }
-
-        @Override
-        public void setArguments(Bundle args) {
-            mOption = args.getInt("option");
+        public static ThirdStepFragment newInstance(final int option) {
+            final ThirdStepFragment f = new ThirdStepFragment();
+            final Bundle args = new Bundle();
+            args.putInt(ARG_OPTION_IDX, option);
+            f.setArguments(args);
+            return f;
         }
 
         @Override
@@ -181,7 +175,7 @@ public class GuidedStepActivity extends Activity {
             String title = getString(R.string.guidedstep_third_title);
             String breadcrumb = getString(R.string.guidedstep_third_breadcrumb);
             String description = getString(R.string.guidedstep_third_command)
-                    + OPTION_NAMES[mOption];
+                    + OPTION_NAMES[getArguments().getInt(ARG_OPTION_IDX)];
             Drawable icon = getActivity().getDrawable(R.drawable.ic_main_icon);
             return new Guidance(title, description, breadcrumb, icon);
         }

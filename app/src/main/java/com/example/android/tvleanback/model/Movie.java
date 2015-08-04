@@ -18,7 +18,6 @@ package com.example.android.tvleanback.model;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.util.Log;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -39,11 +38,9 @@ public class Movie implements Parcelable {
     private String mStudio;
     private String mCategory;
 
-    public Movie() {
+    public Movie() {}
 
-    }
-
-    public Movie(Parcel in){
+    public Movie(Parcel in) {
         String[] data = new String[8];
 
         in.readStringArray(data);
@@ -143,7 +140,7 @@ public class Movie implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeStringArray(new String[] {mId,
+        dest.writeStringArray(new String[]{mId,
                 mTitle,
                 mDescription,
                 mBgImageUrl,
@@ -157,12 +154,12 @@ public class Movie implements Parcelable {
     public String toString() {
         StringBuilder sb = new StringBuilder(200);
         sb.append("Movie{");
-        sb.append("mId=" + mId);
-        sb.append(", mTitle='" + mTitle + '\'');
-        sb.append(", mVideoUrl='" + mVideoUrl + '\'');
-        sb.append(", backgroundImageUrl='" + mBgImageUrl + '\'');
-        sb.append(", backgroundImageURI='" + getBackgroundImageURI().toString() + '\'');
-        sb.append(", mCardImageUrl='" + mCardImageUrl + '\'');
+        sb.append("mId=").append(mId);
+        sb.append(", mTitle='").append(mTitle).append('\'');
+        sb.append(", mVideoUrl='").append(mVideoUrl).append('\'');
+        sb.append(", backgroundImageUrl='").append(mBgImageUrl).append('\'');
+        sb.append(", backgroundImageURI='").append(getBackgroundImageURI().toString()).append('\'');
+        sb.append(", mCardImageUrl='").append(mCardImageUrl).append('\'');
         sb.append('}');
         return sb.toString();
     }

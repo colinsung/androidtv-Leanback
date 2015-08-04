@@ -23,7 +23,9 @@ import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.ResultReceiver;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.widget.VideoView;
 
 import com.bumptech.glide.Glide;
@@ -34,22 +36,48 @@ import com.example.android.tvleanback.Utils;
 import com.example.android.tvleanback.data.VideoProvider;
 import com.example.android.tvleanback.model.Movie;
 
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * PlaybackOverlayActivity for video playback that loads PlaybackOverlayFragment
+ * PlaybackActivity for video playback that loads PlaybackOverlayFragment and handles
+ * the MediaSession object used to maintain the state of the media playback.
  */
 public class PlaybackActivity extends Activity {
 
+    /*
+     * List of various states that we can be in
+     */
+    public enum LeanbackPlaybackState {
+        PLAYING, PAUSED, IDLE
+    }
+
     public static final String AUTO_PLAY = "auto_play";
     private static final String TAG = PlaybackActivity.class.getSimpleName();
-    private VideoView mVideoView;
+    private VideoView mVideoView; // VideoView is used to play the video (media) in a view.
     private LeanbackPlaybackState mPlaybackState = LeanbackPlaybackState.IDLE;
-    private MediaSession mSession;
+    private MediaSession mSession; // MediaSession is used to hold the state of our media playback.
     private int mPosition = 0;
     private long mStartTimeMillis;
     private long mDuration = -1;
+    private Movie mSelectedMovie;
+    private ArrayList<Movie> mItems = new ArrayList<Movie>();
+    private int mCurrentItem;
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_R1) {
+            getMediaController().getTransportControls().skipToNext();
+            return true;
+        } else if (keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
+            getMediaController().getTransportControls().skipToPrevious();
+            return true;
+        }
+
+        return super.onKeyDown(keyCode, event);
+    }
 
     /**
      * Called when the activity is first created.
@@ -62,6 +90,26 @@ public class PlaybackActivity extends Activity {
 
         setContentView(R.layout.playback_controls);
         loadViews();
+        mItems = new ArrayList<>();
+
+        HashMap<String, List<Movie>> movies = VideoProvider.getMovieList();
+
+        if (movies != null) {
+            for (Map.Entry<String, List<Movie>> entry : movies.entrySet()) {
+                if (mSelectedMovie.getCategory().contains(entry.getKey())) {
+                    List<Movie> list = entry.getValue();
+                    if (list != null && !list.isEmpty()) {
+                        for (int j = 0; j < list.size(); j++) {
+                            mItems.add(list.get(j));
+                            if (mSelectedMovie.getTitle().contentEquals(list.get(j).getTitle())) {
+                                mCurrentItem = j;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         playPause(true);
         //Example for handling resizing view for overscan
         //Utils.overScan(this, mVideoView);
@@ -98,6 +146,7 @@ public class PlaybackActivity extends Activity {
 
             mSession.setActive(true);
 
+            // Set the Activity's MediaController used to invoke transport controls / adjust volume.
             setMediaController(new MediaController(this, mSession.getSessionToken()));
         }
     }
@@ -116,13 +165,12 @@ public class PlaybackActivity extends Activity {
             mStartTimeMillis = System.currentTimeMillis();
         } else {
             mPlaybackState = LeanbackPlaybackState.PAUSED;
-            int timeElapsedSinceStart = (int)(System.currentTimeMillis() - mStartTimeMillis);
+            int timeElapsedSinceStart = (int) (System.currentTimeMillis() - mStartTimeMillis);
             setPosition(mPosition + timeElapsedSinceStart);
             mVideoView.pause();
         }
         updatePlaybackState();
     }
-
 
     private void updatePlaybackState() {
         PlaybackState.Builder stateBuilder = new PlaybackState.Builder()
@@ -138,7 +186,9 @@ public class PlaybackActivity extends Activity {
     private long getAvailableActions() {
         long actions = PlaybackState.ACTION_PLAY |
                 PlaybackState.ACTION_PLAY_FROM_MEDIA_ID |
-                PlaybackState.ACTION_PLAY_FROM_SEARCH;
+                PlaybackState.ACTION_PLAY_FROM_SEARCH |
+                PlaybackState.ACTION_SKIP_TO_NEXT |
+                PlaybackState.ACTION_SKIP_TO_PREVIOUS;
 
         if (mPlaybackState == LeanbackPlaybackState.PLAYING) {
             actions |= PlaybackState.ACTION_PAUSE;
@@ -167,25 +217,25 @@ public class PlaybackActivity extends Activity {
         metadataBuilder.putString(MediaMetadata.METADATA_KEY_ARTIST, movie.getStudio());
 
         Glide.with(this)
-            .load(Uri.parse(movie.getCardImageUrl()))
-            .asBitmap()
-            .into(new SimpleTarget<Bitmap>(500, 500) {
-                @Override
-                public void onResourceReady(Bitmap bitmap, GlideAnimation anim) {
-                    metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap);
-                    mSession.setMetadata(metadataBuilder.build());
-                }
-            });
+                .load(Uri.parse(movie.getCardImageUrl()))
+                .asBitmap()
+                .into(new SimpleTarget<Bitmap>(500, 500) {
+                    @Override
+                    public void onResourceReady(Bitmap bitmap, GlideAnimation anim) {
+                        metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap);
+                        mSession.setMetadata(metadataBuilder.build());
+                    }
+                });
     }
 
     private void loadViews() {
         mVideoView = (VideoView) findViewById(R.id.videoView);
         mVideoView.setFocusable(false);
         mVideoView.setFocusableInTouchMode(false);
+        mSelectedMovie = getIntent().getParcelableExtra(MovieDetailsActivity.MOVIE);
 
-        Movie movie = getIntent().getParcelableExtra(MovieDetailsActivity.MOVIE);
-        setVideoPath(movie.getVideoUrl());
-        updateMetadata(movie);
+        setVideoPath(mSelectedMovie.getVideoUrl());
+        updateMetadata(mSelectedMovie);
     }
 
     private void setupCallbacks() {
@@ -200,7 +250,6 @@ public class PlaybackActivity extends Activity {
             }
         });
 
-
         mVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
             @Override
             public void onPrepared(MediaPlayer mp) {
@@ -209,7 +258,6 @@ public class PlaybackActivity extends Activity {
                 }
             }
         });
-
 
         mVideoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
@@ -239,8 +287,6 @@ public class PlaybackActivity extends Activity {
         playPause(false);
     }
 
-
-
     @Override
     public void onVisibleBehindCanceled() {
         playPause(false);
@@ -259,18 +305,15 @@ public class PlaybackActivity extends Activity {
         return true;
     }
 
-    /*
-     * List of various states that we can be in
-     */
-    public enum LeanbackPlaybackState {
-        PLAYING, PAUSED, IDLE
-    }
-
+    // An event was triggered by MediaController.TransportControls and must be handled here.
+    // Here we update the media itself to act on the event that was triggered.
     private class MediaSessionCallback extends MediaSession.Callback {
+
         @Override
         public void onPlay() {
             playPause(true);
         }
+
         @Override
         public void onPause() {
             playPause(false);
@@ -285,6 +328,42 @@ public class PlaybackActivity extends Activity {
                 updateMetadata(movie);
                 playPause(extras.getBoolean(AUTO_PLAY));
             }
+        }
+
+        @Override
+        public void onSkipToNext() {
+            // Update the media to skip to the next video.
+            PlaybackState.Builder stateBuilder = new PlaybackState.Builder()
+                    .setActions(getAvailableActions());
+            stateBuilder.setState(PlaybackState.STATE_SKIPPING_TO_NEXT, 0, 1.0f);
+            mSession.setPlaybackState(stateBuilder.build());
+
+            if (++mCurrentItem >= mItems.size()) {
+                mCurrentItem = 0;
+            }
+            Bundle bundle = new Bundle();
+            bundle.putBoolean(PlaybackActivity.AUTO_PLAY, true);
+
+            String nextId = mItems.get(mCurrentItem).getId();
+            getMediaController().getTransportControls().playFromMediaId(nextId, bundle);
+        }
+
+        @Override
+        public void onSkipToPrevious() {
+            // Update the media to skip to the previous video.
+            PlaybackState.Builder stateBuilder = new PlaybackState.Builder()
+                    .setActions(getAvailableActions());
+            stateBuilder.setState(PlaybackState.STATE_SKIPPING_TO_PREVIOUS, 0, 1.0f);
+            mSession.setPlaybackState(stateBuilder.build());
+
+            if (--mCurrentItem < 0) {
+                mCurrentItem = mItems.size() - 1;
+            }
+            Bundle bundle = new Bundle();
+            bundle.putBoolean(PlaybackActivity.AUTO_PLAY, true);
+
+            String prevId = mItems.get(mCurrentItem).getId();
+            getMediaController().getTransportControls().playFromMediaId(prevId, bundle);
         }
 
         @Override
